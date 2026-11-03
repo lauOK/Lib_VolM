@@ -1,0 +1,76 @@
+# Lib_VolM 配置源文件（volm-cfg/1，由 vol-cfg-tool v0.2.0 写出，目标库 V1.4）
+#   —— 配置的唯一真源，与生成的 C 文件一起入库。
+# 改配置：导入 vol-cfg-tool → 修改 → 重新下载 vol_cfg.h + vol_cfg.c 覆盖原文件。
+# 手工编辑：字段名与层级不要改；单位见各行注释（电压 mV、电阻 Ω、时间 ms）。
+# 版本：schema 是格式版本，决定兼容性——新版工具能读旧格式（自动升级），
+#       旧版工具读到格式号更大的文件会直接报错（F2），不会猜着读。generator 只记录是谁写的。
+
+schema: volm-cfg/1
+
+generator:                             # 写出本文件的工具（纯记录，可省略，不参与兼容性判断）
+  tool: vol-cfg-tool
+  version: '0.2.0'
+
+module:
+  sample_period_ms: 10                 # 采样周期 ms；by_time 模式靠它把 ms 换算成点数，须 >= 1
+  filter_window_max: 64                # 单通道滤波窗口上限，1..1024（仅用于编译期断言）
+  state_num_max: 12                    # 单通道状态数上限，1..12（仅用于断言）
+  channel_num_max: 8                   # 通道实例数上限（仅用于断言）
+  r_max_ohm: 1000000                   # 分压电阻上限 Ω（挡住 5.1k 写成 5100000）
+  comment: 示例为 12 V 系统 + 一路 RBIN # 生成文件「通道级配置」标题括号内的说明
+
+channels:
+  - name: KL30 常电
+    # comment 省略：通道 banner 按参数自动生成
+    adc:
+      fs: 4095                         # 满量程码值：12 位填 4095，16 位填 65535
+      vref_mv: 5000                    # ADC 参考电压 mV
+    divider:
+      r_high_ohm: 10000                # 上臂电阻 Ω（注意不是 kΩ）
+      r_low_ohm: 2000                  # 下臂电阻 Ω，须 > 0
+    calib:
+      gain_ppm: 0                      # 增益残差 ppm；实测偏低填正数
+      offset_mv: 0                     # 偏置残差 mV，可为负
+    filter:
+      mode: by_sample                  # by_time（arg 是毫秒）| by_sample（arg 是点数）
+      arg: 10                          # 滤波点数
+    # 量程由 states.boundaries 最后一条（bn）给出，此处不重复
+    states:
+      mode: stateful                   # 有状态；另一个取值 measure_only（仅测量）
+      # names：顺序 = 电压由低到高，个数 n；boundaries 必须正好 n 条（b1..bn）
+      names: [严重欠压 / 断线, 低压, 正常, 高压]
+      # b0 恒为 0，不写；b1..b(n-1) 是相邻状态的分界，bn 是量程上限 → 生成 VOLTAGE_MAX_MV。
+      # 迟滞归属：hyst_up 归低侧状态（离开门限 = 边界 + 它）；
+      #           hyst_down 归高侧状态（离开门限 = 边界 − 它）。
+      boundaries:
+        - upper_mv: 6000               # b1：S0 上限 / S1 下限
+          hyst_up_mv: 0                # S0 向上门限 = 6.0 V
+          hyst_down_mv: 500            # S1 向下门限 = 5.5 V
+        - upper_mv: 9000               # b2：S1 上限 / S2 下限
+          hyst_up_mv: 1000             # S1 向上门限 = 10.0 V
+          hyst_down_mv: 2000           # S2 向下门限 = 7.0 V
+        - upper_mv: 16000              # b3：S2 上限 / S3 下限
+          hyst_up_mv: 500              # S2 向上门限 = 16.5 V
+          hyst_down_mv: 500            # S3 向下门限 = 15.5 V
+        - upper_mv: 20000              # b4 = 量程上限 → VOLTAGE_MAX_MV（末状态无上邻，无迟滞）
+
+  - name: RBIN 冗余蓄电池
+    comment: |-                        # 进生成文件的通道 banner；省略则按参数自动生成
+      通道 1：RBIN 冗余蓄电池采样（24 V 系统），分压 100 kΩ / 8.2 kΩ
+      仅测量通道：只做「换算 + 滤波 + 提供电压」，不管理状态。
+      STATE_NUM = 0 时下列 S<i> 宏一个都不需要定义（架构 D11 / C12）。
+    adc:
+      fs: 4095                         # 满量程码值：12 位填 4095，16 位填 65535
+      vref_mv: 5000                    # ADC 参考电压 mV
+    divider:
+      r_high_ohm: 100000               # 上臂电阻 Ω（注意不是 kΩ）
+      r_low_ohm: 8200                  # 下臂电阻 Ω，须 > 0
+    calib:
+      gain_ppm: 0                      # 增益残差 ppm；实测偏低填正数
+      offset_mv: 0                     # 偏置残差 mV，可为负
+    filter:
+      mode: by_sample                  # by_time（arg 是毫秒）| by_sample（arg 是点数）
+      arg: 16                          # 滤波点数
+    voltage_max_mv: 44000              # 本通道量程 mV（限幅；无状态表，故在此给出）
+    states:
+      mode: measure_only               # 无状态：只换算 + 滤波 + 提供电压（STATE_NUM = 0）

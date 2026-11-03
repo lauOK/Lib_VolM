@@ -1,0 +1,20 @@
+# ---- Node / 工具链 ----
+node_modules/
+*.log
+
+# ---- 配置工具构建中间物 ----
+# dist/index.html 是单文件成品，保留入库（start.cmd 双击即用）；
+# 这里只忽略 Vite 的临时目录（若有）
+tools/vol-cfg-tool/.vite/
+
+# ---- 单元测试编译产物 ----
+UnitTest/build/
+*.o
+*.exe
+*.out
+
+# ---- 编辑器 / 系统杂物 ----
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
