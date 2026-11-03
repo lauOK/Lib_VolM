@@ -10,6 +10,8 @@
 4. 点 **导出配置** 把 `vol_cfg.yaml` 与两份 C 文件一起入库。
 
 > 换配置永远回工具里改，不要手改 C 文件——生成会整份覆盖，手改的东西会丢。
+>
+> **注意区分两个 index.html**：工具根目录的 `index.html` 是 Vite 开发入口（仅 `npm run dev` 时用，双击必白页——浏览器不认 .tsx、file:// 下 module 脚本被 CORS 禁止、`/src` 绝对路径指向磁盘根）；**双击要用的是 `start.cmd` 或 `dist/index.html`**。分发包里的 `index.html` 是成品副本，可直接双击。
 
 ## 三份文件的分工
 
