@@ -66,7 +66,7 @@ Vol_ReturnType  Vol_GetState(uint8_t ch, uint8_t *state);
 ## 3. 集成步骤（5 分钟版）
 
 1. 把 `inc/`、`src/` 加入工程（C99，建议 `-Wall -Wextra -Werror`）。
-2. 在 `inc/vol_cfg.h` 按注释填写模块级与通道级宏（见 §4）。
+2. 在 `inc/vol_cfg.h` 按注释填写模块级与通道级宏（见 §4）；**推荐改用 §4.5 的配置工具生成**，不用手写宏也不用担心断言配错；
 3. 若 `Vol_SetAdcValue` 在 ADC 中断、`Vol_Task` 在主循环（典型用法），在工程配置中覆盖临界区宏：
    ```c
    #define VOL_CRITICAL_ENTER()   __disable_irq()   /* 或 OS 临界区 */
@@ -134,9 +134,25 @@ Vol_ReturnType  Vol_GetState(uint8_t ch, uint8_t *state);
 - `Vol_Task` 跳过该通道；`Vol_GetState` 恒返回 `VOL_E_NO_STATE`；
 - 电压换算、滤波、`Vol_GetVoltage` 全部正常工作，量程独立（示例 CH1 为 44000 mV）。
 
+### 4.5 配置工具（vol-cfg-tool）
+
+`tools/vol-cfg-tool/` 是配套的**配置生成工具**：网页表单填写上述全部宏，实时校验（与库的编译期断言同一套规则 C1~C11），**0 错误后一键下载 `vol_cfg.h` + `vol_cfg.c`**，直接覆盖 `inc/` 与 `src/` 同名文件，保证生成的代码必然能编译。
+
+| 要点 | 说明 |
+|---|---|
+| 使用方式 | 双击 `tools/vol-cfg-tool/start.cmd`（或 `dist/index.html`），单文件离线可用，无任何网络请求 |
+| 配置唯一真源 | `vol_cfg.yaml`。页面上"导入配置/导出配置"往返，字段严格校验；生成物整份覆盖，**不要手改 C 文件** |
+| 标定打点 | 电阻有偏差时，在通道卡片填几个实测点（ADC 码值 + 万用表电压），工具自动拟合出 `GAIN_PPM` / `OFFSET_MV`，点保存在 yaml 的 `calib_points` 段 |
+| 校验规则 | F1~F6（文件/语法）、C1~C11（与库断言逐条对拍）、W1~W9（工程建议）；详情见 `doc/VolM_Architecture.md` §5.3 |
+| 兼容性 | 配置格式 `volm-cfg/1`：新工具读旧配置自动升级，旧工具读新配置直接报错（只向下兼容） |
+
+工具的详细用法、命令与测试矩阵见 `tools/vol-cfg-tool/README.md`。
+
 ---
 
 ## 5. 新增一个通道的完整步骤
+
+> 用 §4.5 配置工具的话没有这一节的事：页面上把通道数加 1、填好参数，下载覆盖即可。以下为手写宏的流程。
 
 1. `inc/vol_cfg.h`：复制一组 `VOL_CHn_*` 宏（含分压、标定、滤波、量程；有状态管理则含全部 `S<i>` 宏），n 顺延。
 2. `src/vol_cfg.c`：新增一块通道代码——`static Vol_FilterSampleType vol_chn_buf[VOL_CHn_FILT_WINDOW];`、状态表（若有）、`VOL_ASSERT_CH_COMMON(CHn)` 与 C3~C7/C10 断言（照抄通道 0 改记号）、配置表加一条表项。
